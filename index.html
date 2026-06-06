@@ -227,6 +227,15 @@
       <span style="cursor:pointer;text-decoration:underline;color:var(--muted);margin-left:6px" onclick="disconnectSheet()">Disconnect</span>
     </div>
 
+        <div class="banner hidden" id="workerBanner" style="border-left-color:var(--accent3)">
+      <strong style="color:var(--accent3)">Connect AI Lookup</strong><br />
+      Paste your Cloudflare Worker URL to enable macro estimation.
+      <div class="input-row">
+        <input type="url" id="workerInput" placeholder="https://anthropic-proxy.YOUR-NAME.workers.dev" />
+        <button class="btn-sm" style="background:var(--accent3)" onclick="saveWorkerUrl()">Save</button>
+      </div>
+    </div>
+
     <!-- Daily ring -->
     <div class="daily-card">
       <div class="ring-wrap">
@@ -334,6 +343,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       if (sheetUrl) showConnected();
+      if (!localStorage.getItem('ct_worker')) document.getElementById('workerBanner').classList.remove('hidden');
       updateRing();
     });
 
@@ -354,6 +364,13 @@
       document.getElementById('connectedBanner').classList.remove('hidden');
     }
 
+    function saveWorkerUrl() {
+      const val = document.getElementById('workerInput').value.trim();
+      if (!val.startsWith('https://')) return showToast('Invalid URL', true);
+      localStorage.setItem('ct_worker', val);
+      location.reload();
+    }
+
     function disconnectSheet() {
       localStorage.removeItem('ct_url');
       sheetUrl = '';
@@ -368,17 +385,28 @@
       el.classList.add('active');
     }
 
+    // ─── PASTE YOUR CLOUDFLARE WORKER URL HERE ───────────────────────────────
+    const WORKER_URL = localStorage.getItem('ct_worker') || '';
+    // ─────────────────────────────────────────────────────────────────────────
+
     // AI Lookup
     async function handleLookup() {
       const query = document.getElementById('queryInput').value.trim();
       if (!query) return;
+
+      if (!WORKER_URL) {
+        showToast('Add Worker URL — see setup banner', true);
+        document.getElementById('workerBanner').classList.remove('hidden');
+        return;
+      }
+
       const btn = document.getElementById('lookupBtn');
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner"></div>Analysing';
       discardAi();
 
       try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch(WORKER_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
